@@ -171,16 +171,27 @@ Further reading & resource:
 ### Checkpoint quiz
 
 1. What limits maximum speedup under Amdahl's Law?
+
+- The serial fraction (1 - p).
+
 2. Threads within a process share: 
    a) stack
    b) address space
    c) program counter
+
+  - b) address space
 
 3. SIMT differs from from SIMD mainly because:
    a) SIMT has no vector units
    b) SIMT threads can diverge on branches
    c) SIMD is GPU-only
 
+  - b) SIMT threads can diverge on branches
+
 4. With p = 0.95 and infinite workers, Amdahl speedup?
 
+  - 1 / (1 - 0.95) = 20
+
 5. Why is a per-thread partial sum faster than a mutex-protected shared sum?
+
+  - Because each thread works on its own local data without contention, avoiding the overhead of locking a shared resource.
