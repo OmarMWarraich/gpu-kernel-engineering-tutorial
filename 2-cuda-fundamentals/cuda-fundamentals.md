@@ -72,7 +72,7 @@ Hints:
 Acceptance tests:
 
 ```bash
-nvcc --arch=native hello.cu -o hello && ./hello | wc -l # 8
+nvcc -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.') hello.cu -o hello && ./hello # 8 lines of output
 ```
 
 **Exercise 2 - Vector add kernel**
@@ -90,7 +90,7 @@ nvcc --arch=native hello.cu -o hello && ./hello | wc -l # 8
 **Acceptance tests**:
 
 ```bash
-nvcc --arch=native vector_add.cu -o vector_add && ./vector_add # prints max error = 0
+nvcc -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.') vector_add.cu -o vector_add && ./vector_add # prints max error = 0
 ```
 
 **Exercise 3 - Coalescing benchmark**
@@ -108,7 +108,7 @@ nvcc --arch=native vector_add.cu -o vector_add && ./vector_add # prints max erro
 **Acceptance tests**:
 
 ```bash
-nvcc --arch=native coalesce.cu -o coalesce && ./coalesce # coalesced GB/s should be >3x strided GB/s
+nvcc -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.') coalesce.cu -o coalesce && ./coalesce # coalesced GB/s should be >3x strided GB/s
 ```
 
 ### Performance checklist / common pitfalls
