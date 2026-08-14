@@ -20,6 +20,9 @@ This lesson introduces the CUDA programming model: how work is organized into gr
 # Verify
 nvidia-smi
 nvcc --version
+
+# Set the target architecture for all nvcc commands below
+export ARCH=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.')
 ```
 
 ### Concepts and theory
@@ -72,7 +75,7 @@ Hints:
 Acceptance tests:
 
 ```bash
-nvcc -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.') hello.cu -o hello && ./hello # 8 lines of output
+nvcc -arch=$ARCH hello.cu -o hello && ./hello # 8 lines of output
 ```
 
 **Exercise 2 - Vector add kernel**
@@ -90,7 +93,7 @@ nvcc -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head 
 **Acceptance tests**:
 
 ```bash
-nvcc -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.') vector_add.cu -o vector_add && ./vector_add # prints max error = 0
+nvcc -arch=$ARCH vector_add.cu -o vector_add && ./vector_add # prints max error = 0
 ```
 
 **Exercise 3 - Coalescing benchmark**
@@ -108,7 +111,7 @@ nvcc -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head 
 **Acceptance tests**:
 
 ```bash
-nvcc -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.') coalesce.cu -o coalesce && ./coalesce # coalesced GB/s should be >3x strided GB/s
+nvcc -arch=$ARCH coalesce.cu -o coalesce && ./coalesce # coalesced GB/s should be >3x strided GB/s
 ```
 
 ### Performance checklist / common pitfalls

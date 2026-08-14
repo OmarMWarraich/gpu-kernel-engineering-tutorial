@@ -18,6 +18,9 @@ You will implement the canonical GPU kernels — vector add, naive and tiled mat
 ```bash
 nvcc --version                 # CUDA 12.1
 python3 -c "import numpy"      # NumPy for verification
+
+# Set the target architecture for all nvcc commands below
+export ARCH=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.')
 ```
 
 ### Concepts and theory
@@ -64,7 +67,7 @@ The last 32 elements can be reduced without shared memory using warp shuffles (_
 **Acceptance tests:**
 
 ```bash
-nvcc -O3 -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.') matmul.cu -o matmul && ./matmul naive
+nvcc -O3 -arch=$ARCH matmul.cu -o matmul && ./matmul naive
 python3 verify_matmul.py    # "PASS"
 ```
 
@@ -98,5 +101,5 @@ python3 verify_matmul.py    # "PASS"
 **Acceptance tests:**
 
 ```bash
-nvcc -O3 -arch=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.') reduce.cu -o reduce && ./reduce   # "PASS rel_err=..."
+nvcc -O3 -arch=$ARCH reduce.cu -o reduce && ./reduce   # "PASS rel_err=..."
 ```
