@@ -1,6 +1,6 @@
 # GPU Kernel Engineering Tutorial
 
-A hands-on, four-part course that takes you from parallel programming fundamentals on the CPU to writing, verifying, profiling, and optimizing real CUDA kernels on the GPU. Each lesson pairs a written guide (theory, pitfalls, further reading, and a checkpoint quiz) with small, self-contained exercise programs you compile and run yourself.
+A hands-on, five-part course that takes you from parallel programming fundamentals on the CPU to writing, verifying, profiling, and optimizing real CUDA kernels on the GPU, and finally to productive ML-focused GPU programming with Triton. Each lesson pairs a written guide (theory, pitfalls, further reading, and a checkpoint quiz) with small, self-contained exercise programs you compile and run yourself.
 
 ## Curriculum
 
@@ -10,6 +10,7 @@ A hands-on, four-part course that takes you from parallel programming fundamenta
 | [2 — CUDA Fundamentals](2-cuda-fundamentals/cuda-fundamentals.md) | Grid/block/thread/warp hierarchy, GPU memory spaces, coalescing, warp divergence, occupancy, profiling with `nsys`/`ncu` | Hello kernel, GPU vector add, coalescing microbenchmark | ★★★☆ |
 | [3 — Hands-On Kernels](3-hands-on-kernel/hands-on-kernel.md) | Arithmetic intensity, shared-memory tiling, tree-based reduction, warp shuffle intrinsics, GFLOPS/bandwidth math, NumPy verification | Naive & tiled matmul, parallel reduction | ★★★☆ |
 | [4 — Profiling and Optimization](4-profiling-and-optimization/profiling-and-optimization.md) | Nsight Systems/Compute workflows, roofline model, Speed-of-Light analysis, memory- vs compute-bound diagnosis, tiling payoff, unrolling vs register pressure, occupancy tuning | Profile & diagnose naive matmul, tiled DRAM comparison, unroll vs register pressure | ★★★★ |
+| [5 — Triton for ML Ops](5-triton-for-ml-ops/triton-for-ml-ops.md) | Triton programming model, tile-based scheduling, autotuning, kernel fusion for elementwise and GEMM-like layers, memory-bandwidth vs compute trade-offs in PyTorch workflows | Elementwise add in Triton, small GEMM task, fused ReLU/activation payoff | ★★★★★ |
 
 ## Repository layout
 
@@ -36,6 +37,12 @@ A hands-on, four-part course that takes you from parallel programming fundamenta
   profiling-and-optimization.md       # lesson text
   1-profile-and-diagnose/
     naive_report.ncu-rep              # Nsight Compute full report of the naive matmul
+
+5-triton-for-ml-ops/
+  triton-for-ml-ops.md                # lesson text
+  1-elementwise-add-in-triton/        # Triton vector add
+  2-small-gemm-triton-task/           # Triton matmul task
+  3-fused-payoff/                     # fused activation + elementwise payoff
 ```
 
 ## Prerequisites
@@ -45,12 +52,13 @@ A hands-on, four-part course that takes you from parallel programming fundamenta
 - C++17 compiler (g++ ≥ 11 or clang ≥ 14)
 - Python 3.11+
 
-**Lessons 2–4 (GPU):**
+**Lessons 2–5 (GPU):**
 
 - NVIDIA GPU with Compute Capability 7.0+, driver 535.x+
 - CUDA Toolkit 12.1+ (`nvcc`)
 - NumPy (for matmul verification)
 - Nsight Systems (`nsys`) and Nsight Compute (`ncu`) — lesson 4
+- PyTorch and Triton — lesson 5
 
 ```bash
 # Verify your setup
@@ -58,6 +66,7 @@ g++ --version
 nvidia-smi
 nvcc --version
 python3 -c "import numpy"
+python3 -c "import torch, triton"   # lesson 5
 ```
 
 A convenient way to target your GPU's architecture in every `nvcc` invocation:
@@ -130,6 +139,16 @@ ncu --metrics dram__bytes.sum,gpu__time_duration.sum ../../3-hands-on-kernel/1-m
 nvcc -O3 -arch=$ARCH -Xptxas -v ../../3-hands-on-kernel/1-matmul/matmul.cu -o matmul 2>&1 | grep -E "registers|spill"
 ```
 
+### Lesson 5 — Triton for ML Ops
+
+```bash
+cd 5-triton-for-ml-ops
+
+python3 1-elementwise-add-in-triton/*.py        # compare PyTorch vs Triton vector add
+python3 2-small-gemm-triton-task/*.py           # Triton matmul exercise
+python3 3-fused-payoff/fused_relu.py            # fused kernel vs separate ops
+```
+
 > `ncu` may need profiling permission: set `options nvidia NVreg_RestrictProfilingToAdminUsers=0` in `/etc/modprobe.d/` and reboot.
 >
 > Note: at small `N` the whole working set fits in L2, so `dram__bytes.sum` barely differs between naive and tiled — use `N ≥ 4096` to see the ~TILE-fold DRAM reduction.
@@ -148,10 +167,13 @@ The matmul exercise generates A and B deterministically (`sin(i*0.001)` / `cos(i
 - **Speed-of-Light analysis** — compare memory % vs compute % of peak first to classify the bottleneck
 - **Occupancy vs runtime** — extra warps beyond latency-hiding add nothing; register spills from chasing occupancy can hurt
 - **Unrolling & ILP** — `#pragma unroll` boosts instruction-level parallelism at the cost of register pressure
+- **Triton tile programming** — express kernels as block-level operations over tiles and let the compiler handle thread/warp details
+- **Kernel fusion** — combine elementwise, activation, and reduction ops into one kernel to avoid round-trips through DRAM
+- **Autotuning** — search over tile sizes and pipeline stages to maximize occupancy and bandwidth on a target GPU
 
 ## Profiling
 
-Covered in depth in [Lesson 4](4-profiling-and-optimization/profiling-and-optimization.md). Quick reference:
+Covered in depth in [Lesson 4](4-profiling-and-optimization/profiling-and-optimization.md) and reused in [Lesson 5](5-triton-for-ml-ops/triton-for-ml-ops.md). Quick reference:
 
 ```bash
 nsys profile -o run ./vector-add   # timeline of kernels and memcpys
