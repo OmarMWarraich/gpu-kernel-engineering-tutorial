@@ -3,7 +3,7 @@
 #include <cstring>                // strcmp for parsing CLI arguments
 #include <vector>                 // std::vector for host-side matrices
 
-constexpr int N = 1024;          // Matrix dimension: 1024 x 1024
+constexpr int N = 8192;          // Matrix dimension: 8192 x 8192
 constexpr int TILE = 16;         // Tile size used by the tiled kernel; 16x16 threads per block
 
 __global__ void matmul_naive(const float* A, const float* B, float* C, int n) {
