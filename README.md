@@ -1,14 +1,15 @@
 # GPU Kernel Engineering Tutorial
 
-A hands-on, three-part course that takes you from parallel programming fundamentals on the CPU to writing, verifying, and benchmarking real CUDA kernels on the GPU. Each lesson pairs a written guide (theory, pitfalls, further reading, and a checkpoint quiz) with small, self-contained exercise programs you compile and run yourself.
+A hands-on, four-part course that takes you from parallel programming fundamentals on the CPU to writing, verifying, profiling, and optimizing real CUDA kernels on the GPU. Each lesson pairs a written guide (theory, pitfalls, further reading, and a checkpoint quiz) with small, self-contained exercise programs you compile and run yourself.
 
 ## Curriculum
 
-| Lesson | Topic | Exercises |
-|--------|-------|-----------|
-| [1 — Basics of Parallel Programming](1-basics-of-parallel-programming/basics-of-parallel-programming.md) | Threads vs processes, data vs task parallelism, SIMD vs SIMT, latency vs throughput, Amdahl's & Gustafson's Laws, synchronization primitives | Multithreaded vector add, map-reduce sum, Amdahl's Law analysis |
-| [2 — CUDA Fundamentals](2-cuda-fundamentals/cuda-fundamentals.md) | Grid/block/thread/warp hierarchy, GPU memory spaces, coalescing, warp divergence, occupancy, profiling with `nsys`/`ncu` | Hello kernel, GPU vector add, coalescing microbenchmark |
-| [3 — Hands-On Kernels](3-hands-on-kernel/hands-on-kernel.md) | Arithmetic intensity, shared-memory tiling, tree-based reduction, warp shuffle intrinsics, GFLOPS/bandwidth math, NumPy verification | Naive & tiled matmul, parallel reduction |
+| Lesson | Topic | Exercises | Difficulty |
+|--------|-------|-----------|------------|
+| [1 — Basics of Parallel Programming](1-basics-of-parallel-programming/basics-of-parallel-programming.md) | Threads vs processes, data vs task parallelism, SIMD vs SIMT, latency vs throughput, Amdahl's & Gustafson's Laws, synchronization primitives | Multithreaded vector add, map-reduce sum, Amdahl's Law analysis | ★★☆☆ |
+| [2 — CUDA Fundamentals](2-cuda-fundamentals/cuda-fundamentals.md) | Grid/block/thread/warp hierarchy, GPU memory spaces, coalescing, warp divergence, occupancy, profiling with `nsys`/`ncu` | Hello kernel, GPU vector add, coalescing microbenchmark | ★★★☆ |
+| [3 — Hands-On Kernels](3-hands-on-kernel/hands-on-kernel.md) | Arithmetic intensity, shared-memory tiling, tree-based reduction, warp shuffle intrinsics, GFLOPS/bandwidth math, NumPy verification | Naive & tiled matmul, parallel reduction | ★★★☆ |
+| [4 — Profiling and Optimization](4-profiling-and-optimization/profiling-and-optimization.md) | Nsight Systems/Compute workflows, roofline model, Speed-of-Light analysis, memory- vs compute-bound diagnosis, tiling payoff, unrolling vs register pressure, occupancy tuning | Profile & diagnose naive matmul, tiled DRAM comparison, unroll vs register pressure | ★★★★ |
 
 ## Repository layout
 
@@ -30,6 +31,11 @@ A hands-on, three-part course that takes you from parallel programming fundament
   1-matmul/matmul.cu                  # naive + tiled matmul (selectable via CLI)
   1-matmul/verify_matmul.py           # NumPy reference check
   3-reduce/reduce.cu                  # grid-stride + shared-memory tree + warp shuffle reduction
+
+4-profiling-and-optimization/
+  profiling-and-optimization.md       # lesson text
+  1-profile-and-diagnose/
+    naive_report.ncu-rep              # Nsight Compute full report of the naive matmul
 ```
 
 ## Prerequisites
@@ -39,11 +45,12 @@ A hands-on, three-part course that takes you from parallel programming fundament
 - C++17 compiler (g++ ≥ 11 or clang ≥ 14)
 - Python 3.11+
 
-**Lessons 2–3 (GPU):**
+**Lessons 2–4 (GPU):**
 
 - NVIDIA GPU with Compute Capability 7.0+, driver 535.x+
 - CUDA Toolkit 12.1+ (`nvcc`)
 - NumPy (for matmul verification)
+- Nsight Systems (`nsys`) and Nsight Compute (`ncu`) — lesson 4
 
 ```bash
 # Verify your setup
@@ -104,6 +111,29 @@ nvcc -O3 -arch=$ARCH reduce.cu -o reduce
 ./reduce                  # sums 1<<26 floats; "PASS rel_err=..." and GB/s
 ```
 
+### Lesson 4 — Profiling and optimization
+
+Uses the matmul binary from lesson 3.
+
+```bash
+cd 4-profiling-and-optimization/1-profile-and-diagnose
+
+# Exercise 1: full profile of the naive matmul, then read the details page
+ncu --set full -o naive_report ../../3-hands-on-kernel/1-matmul/matmul naive
+ncu --import naive_report.ncu-rep --page details
+
+# Exercise 2: compare DRAM traffic and runtime, naive vs tiled
+ncu --metrics dram__bytes.sum,gpu__time_duration.sum ../../3-hands-on-kernel/1-matmul/matmul naive
+ncu --metrics dram__bytes.sum,gpu__time_duration.sum ../../3-hands-on-kernel/1-matmul/matmul tiled
+
+# Exercise 3: registers/spills when adding #pragma unroll to the tiled kernel
+nvcc -O3 -arch=$ARCH -Xptxas -v ../../3-hands-on-kernel/1-matmul/matmul.cu -o matmul 2>&1 | grep -E "registers|spill"
+```
+
+> `ncu` may need profiling permission: set `options nvidia NVreg_RestrictProfilingToAdminUsers=0` in `/etc/modprobe.d/` and reboot.
+>
+> Note: at small `N` the whole working set fits in L2, so `dram__bytes.sum` barely differs between naive and tiled — use `N ≥ 4096` to see the ~TILE-fold DRAM reduction.
+
 The matmul exercise generates A and B deterministically (`sin(i*0.001)` / `cos(i*0.001)`) so the CUDA binary and [verify_matmul.py](3-hands-on-kernel/1-matmul/verify_matmul.py) reproduce identical inputs; the GPU result is written to `C_gpu.bin` for comparison.
 
 ## Key ideas covered
@@ -114,13 +144,21 @@ The matmul exercise generates A and B deterministically (`sin(i*0.001)` / `cos(i
 - **Memory coalescing** — contiguous per-warp access turns 32 transactions into a few
 - **Shared-memory tiling** — reusing each tile `TILE` times raises arithmetic intensity from ~0.25 flop/byte
 - **Tree reduction** — O(log N) steps, finished with `__shfl_down_sync` warp shuffles and a single `atomicAdd` per block
+- **Roofline model** — attainable performance is bounded by $P = \min(P_{peak}, I \times BW_{mem})$; below the ridge point ($I_{ridge} = P_{peak}/BW_{mem}$) a kernel is memory-bound
+- **Speed-of-Light analysis** — compare memory % vs compute % of peak first to classify the bottleneck
+- **Occupancy vs runtime** — extra warps beyond latency-hiding add nothing; register spills from chasing occupancy can hurt
+- **Unrolling & ILP** — `#pragma unroll` boosts instruction-level parallelism at the cost of register pressure
 
 ## Profiling
+
+Covered in depth in [Lesson 4](4-profiling-and-optimization/profiling-and-optimization.md). Quick reference:
 
 ```bash
 nsys profile -o run ./vector-add   # timeline of kernels and memcpys
 nsys stats run.nsys-rep            # summary tables
 ncu --set basic ./vector-add       # per-kernel hardware metrics
+ncu --set full -o report ./matmul naive   # full report saved to report.ncu-rep
+ncu --import report.ncu-rep --page details
 ```
 
 ## Common pitfalls
