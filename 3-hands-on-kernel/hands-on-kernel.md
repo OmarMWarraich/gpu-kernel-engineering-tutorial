@@ -60,6 +60,7 @@ The last 32 elements can be reduced without shared memory using warp shuffles (_
 1. 2D blocks: `dim3 block(16,16)`, grid = `ceil(N/16)` in each dim.
 2. `row = blockIdx.y*16 + threadIdx.y`, `col = blockIdx.x*16 + threadIdx.x`.
 3. Generate A, B deterministically (e.g., `a[i]=sin(i)`) so Python can reproduce them.
+
 **Acceptance tests:**
 
 ```bash

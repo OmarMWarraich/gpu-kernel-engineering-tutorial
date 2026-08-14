@@ -25,12 +25,6 @@ sudo apt-get update && sudo apt-get install -y g++ python3
 g++ --version
 ```
 
-```bash
-# MacOS
-brew install gcc python
-g++ --version
-```
-
 ### Concepts and theory
 
 **Threads and processes**
