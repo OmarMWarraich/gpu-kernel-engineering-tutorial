@@ -25,6 +25,11 @@ ncu --version     # Nsight Compute 2023.x
 CUDA 12.1, driver 535.x, Nsight Systems 2023.2, Nsight Compute 2023.1, Ubuntu 22.04.
 ```
 
+# Set the target architecture for all nvcc commands below
+```
+export ARCH=sm_$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d '.')
+```
+
 ## Concepts and theory
 
 Roofline model. Attainable performance is bounded by:
@@ -109,7 +114,7 @@ ncu --metrics dram__bytes.sum ./matmul tiled   # dram bytes significantly lower
 ### Acceptance tests:
 
 ```bash
-nvcc -O3 -arch=native -Xptxas -v matmul.cu -o matmul 2>&1 | grep -E "registers|spill"
+nvcc -O3 -arch=$ARCH -Xptxas -v matmul.cu -o matmul 2>&1 | grep -E "registers|spill"
 ```
 
 

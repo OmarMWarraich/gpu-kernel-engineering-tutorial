@@ -53,7 +53,7 @@ __global__ void matmul_tiled(const float* A, const float* B, float* C, int n) {
 
         // Multiply the shared tile entries and accumulate the partial dot product.
         // Each thread computes TILE multiply-adds in the inner loop.
-        #pragma unroll
+        #pragma unroll 8
         for (int k = 0; k < TILE; ++k) acc += As[ty][k] * Bs[k][tx];
 
         // Wait before reusing shared memory in the next tile iteration.
