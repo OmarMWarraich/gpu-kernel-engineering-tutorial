@@ -103,3 +103,36 @@ python3 verify_matmul.py    # "PASS"
 ```bash
 nvcc -O3 -arch=$ARCH reduce.cu -o reduce && ./reduce   # "PASS rel_err=..."
 ```
+
+### Performance checklist / common pitfalls
+- [] Both __syncthreads() calls present in the tile loop (before and after compute).
+- [] Shared-memory loads coalesced along threadIdx.x.
+- [] Warm-up launch before timing; average over ≥10 iterations.
+- [] Float32 verification uses relative, not absolute, tolerance.
+- Pitfall: missing the second __syncthreads() — a fast thread overwrites a tile others still read (intermittent wrong results).
+- Pitfall: shared-memory bank conflicts with TILE=32 column access; pad arrays ([TILE][TILE+1]) if profiling shows conflicts.
+- Pitfall: single-precision reduction of large N accumulates rounding error — compare against a double-precision reference.
+
+### Further reading & resources
+- NVIDIA "Optimizing Parallel Reduction in CUDA" (Mark Harris) — the classic 7-step reduction deck.
+- NVIDIA CUDA C++ Best Practices Guide — shared memory & tiling chapter.
+- Programming Massively Parallel Processors — matmul tiling walkthrough.
+- CUTLASS (GitHub: NVIDIA/cutlass) — production-grade GEMM building blocks to study next.
+- Simon Boehm, "How to Optimize a CUDA Matmul Kernel" — step-by-step to near-cuBLAS performance.
+
+### Checkpoint quiz
+
+1. Why does tiling speed up matmul? (short answer)
+2. GFLOPS formula for square matmul of size N?
+3. What does __shfl_down_sync operate on? (a) shared memory (b) registers within a warp (c) global memory.
+4. Why two __syncthreads() per tile iteration?
+5. A naive matmul kernel is limited primarily by: (a) flops (b) global memory bandwidth (c) kernel launch overhead.
+
+#### Answers:
+
+1. Each global-memory tile is loaded once into shared memory and reused TILE times, raising arithmetic intensity. 
+2. GFLOPS = 2 * N^3 / (time_in_seconds * 1e9)
+3. (b). 
+4. First ensures tiles are fully loaded before compute; second prevents overwriting tiles still being read.
+5. (b).
+
